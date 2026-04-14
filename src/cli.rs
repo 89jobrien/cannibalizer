@@ -19,6 +19,10 @@ pub enum Command {
         /// Write output to this file (default: stdout)
         #[arg(long, value_name = "FILE")]
         output: Option<PathBuf>,
+
+        /// Print a human-readable harvest report to stderr after the JSONL stream
+        #[arg(long)]
+        report: bool,
     },
 
     /// Build a migration plan from a repo-map file

@@ -5,6 +5,7 @@ use crate::model::SourceLang;
 const MAX_FILE_BYTES: u64 = 512 * 1024;
 
 pub struct ParsedFile {
+    #[allow(dead_code)]
     pub path: PathBuf,
     pub lang: SourceLang,
     pub top_level_kinds: Vec<String>,
