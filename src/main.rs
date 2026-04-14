@@ -2,6 +2,8 @@ use anyhow::bail;
 use clap::Parser;
 
 #[allow(dead_code)]
+mod classifier;
+#[allow(dead_code)]
 mod cli;
 #[allow(dead_code)]
 mod model;
