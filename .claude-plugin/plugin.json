@@ -1,0 +1,8 @@
+{
+  "name": "cannibalizer",
+  "version": "0.1.0",
+  "author": {
+    "name": "Joseph O'Brien"
+  },
+  "description": "Absorb foreign repos into the Rust ecosystem — extract, classify, and generate hexagonal components"
+}
