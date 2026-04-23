@@ -136,7 +136,13 @@ pub mod rules {
             ) {
                 return true;
             }
-            return matches!(parsed.lang, crate::model::SourceLang::Rust);
+            // Only promote empty-parsed Rust files to Glue when the file is
+            // actually empty (0 bytes). A non-empty Rust file that produced zero
+            // top-level kinds most likely failed to parse or uses syntax the
+            // grammar doesn't recognise — fall through to Discard rather than
+            // silently swallowing it as Glue.
+            return matches!(parsed.lang, crate::model::SourceLang::Rust)
+                && parsed.raw_source.trim().is_empty();
         }
 
         // All top-level nodes are dispatch-only → Glue
@@ -206,10 +212,6 @@ pub fn classify(parsed: &ParsedFile, path: &Path) -> ItemKind {
     if rules::is_config(parsed) {
         return ItemKind::Config;
     }
-    // 5b
-    if rules::is_typescript(parsed) {
-        return ItemKind::DomainLogic;
-    }
     // 6
     if rules::is_port(parsed) {
         return ItemKind::Port;
@@ -217,6 +219,12 @@ pub fn classify(parsed: &ParsedFile, path: &Path) -> ItemKind {
     // 7
     if rules::is_adapter(path) {
         return ItemKind::Adapter;
+    }
+    // 5b – TypeScript catch-all fires after path-based Port/Adapter detection
+    // so that TS files in adapters/ or infra/ paths are not misclassified as
+    // DomainLogic. Without tree-sitter-typescript, all TS files fall here.
+    if rules::is_typescript(parsed) {
+        return ItemKind::DomainLogic;
     }
     // 8
     if rules::is_entrypoint(parsed, path) {
