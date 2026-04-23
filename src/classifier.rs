@@ -112,7 +112,12 @@ pub mod rules {
         false
     }
 
-    /// Rule 9 – top_level_kinds contains class / type / struct / enum / impl → DomainLogic
+    /// Rule 9 – top_level_kinds contains class / type / struct / enum / impl /
+    ///           function_definition / function_declaration → DomainLogic.
+    ///
+    /// Python and Shell modules are often function-based with no class at the top
+    /// level.  Treating module-level functions as DomainLogic avoids the Discard
+    /// fallback for legitimate library code.
     pub fn is_domain_logic(parsed: &ParsedFile) -> bool {
         parsed.top_level_kinds.iter().any(|k| {
             k == "class_definition"
@@ -120,6 +125,8 @@ pub mod rules {
                 || k == "struct_item"
                 || k == "enum_item"
                 || k == "impl_item"
+                || k == "function_definition"
+                || k == "function_declaration"
         })
     }
 }
