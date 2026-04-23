@@ -28,12 +28,17 @@ pub mod rules {
         matches!(parsed.lang, SourceLang::Markdown)
     }
 
-    /// Rule 5 – Toml / Yaml / Json → Config
+    /// Rule 5 – Toml / Yaml / Json / Baml → Config
     pub fn is_config(parsed: &ParsedFile) -> bool {
         matches!(
             parsed.lang,
-            SourceLang::Toml | SourceLang::Yaml | SourceLang::Json
+            SourceLang::Toml | SourceLang::Yaml | SourceLang::Json | SourceLang::Baml
         )
+    }
+
+    /// Rule 5b – TypeScript / TSX → DomainLogic (no tree-sitter grammar; classify by lang)
+    pub fn is_typescript(parsed: &ParsedFile) -> bool {
+        matches!(parsed.lang, SourceLang::TypeScript)
     }
 
     /// Rule 6 – top_level_kinds contains interface/protocol/trait → Port
@@ -107,17 +112,39 @@ pub mod rules {
                 .file_name()
                 .map(|n| n.to_string_lossy().to_lowercase())
                 .unwrap_or_default();
-            return matches!(name.as_str(), "lib.rs" | "mod.rs" | "app.rs");
+            return matches!(
+                name.as_str(),
+                "lib.rs" | "mod.rs" | "app.rs" | "__init__.py"
+            );
+        }
+        // Non-empty but all-dispatch: also check __init__.py with only imports
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if name == "__init__.py" {
+            let dispatch_kinds = [
+                "use_declaration",
+                "mod_item",
+                "extern_crate_declaration",
+                "import_statement",
+                "import_from_statement",
+            ];
+            return parsed
+                .top_level_kinds
+                .iter()
+                .all(|k| dispatch_kinds.contains(&k.as_str()));
         }
         false
     }
 
     /// Rule 9 – top_level_kinds contains class / type / struct / enum / impl /
-    ///           function_definition / function_declaration → DomainLogic.
+    ///           function_definition / function_declaration /
+    ///           decorated_definition → DomainLogic.
     ///
-    /// Python and Shell modules are often function-based with no class at the top
-    /// level.  Treating module-level functions as DomainLogic avoids the Discard
-    /// fallback for legitimate library code.
+    /// Python decorated classes (`@dataclass`, `@attrs`) emit `decorated_definition`
+    /// at the top level rather than `class_definition`.  Python and Shell modules
+    /// are often function-based with no class at the top level.
     pub fn is_domain_logic(parsed: &ParsedFile) -> bool {
         parsed.top_level_kinds.iter().any(|k| {
             k == "class_definition"
@@ -127,6 +154,7 @@ pub mod rules {
                 || k == "impl_item"
                 || k == "function_definition"
                 || k == "function_declaration"
+                || k == "decorated_definition"
         })
     }
 }
@@ -152,6 +180,10 @@ pub fn classify(parsed: &ParsedFile, path: &Path) -> ItemKind {
     // 5
     if rules::is_config(parsed) {
         return ItemKind::Config;
+    }
+    // 5b
+    if rules::is_typescript(parsed) {
+        return ItemKind::DomainLogic;
     }
     // 6
     if rules::is_port(parsed) {
@@ -311,6 +343,47 @@ mod tests {
     fn struct_item_gives_domain_logic() {
         let (p, path) = make_parsed("src/model.rs", SourceLang::Rust, vec!["struct_item"], "");
         assert!(matches!(classify(&p, &path), ItemKind::DomainLogic));
+    }
+
+    #[test]
+    fn decorated_definition_gives_domain_logic() {
+        // @dataclass classes emit decorated_definition, not class_definition
+        let (p, path) = make_parsed(
+            "lib/models/trace.py",
+            SourceLang::Python,
+            vec!["import_statement", "decorated_definition"],
+            "",
+        );
+        assert!(matches!(classify(&p, &path), ItemKind::DomainLogic));
+    }
+
+    #[test]
+    fn init_py_with_only_imports_gives_glue() {
+        let (p, path) = make_parsed(
+            "lib/__init__.py",
+            SourceLang::Python,
+            vec!["import_statement", "import_from_statement"],
+            "",
+        );
+        assert!(matches!(classify(&p, &path), ItemKind::Glue));
+    }
+
+    #[test]
+    fn empty_init_py_gives_glue() {
+        let (p, path) = make_parsed("lib/models/__init__.py", SourceLang::Python, vec![], "");
+        assert!(matches!(classify(&p, &path), ItemKind::Glue));
+    }
+
+    #[test]
+    fn typescript_gives_domain_logic() {
+        let (p, path) = make_parsed("src/agent.ts", SourceLang::TypeScript, vec![], "");
+        assert!(matches!(classify(&p, &path), ItemKind::DomainLogic));
+    }
+
+    #[test]
+    fn baml_gives_config() {
+        let (p, path) = make_parsed("baml_src/agent.baml", SourceLang::Baml, vec![], "");
+        assert!(matches!(classify(&p, &path), ItemKind::Config));
     }
 
     #[test]

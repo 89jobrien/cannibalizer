@@ -115,6 +115,8 @@ fn lang_label(lang: &SourceLang) -> &'static str {
         SourceLang::Shell => "shell",
         SourceLang::Nushell => "nushell",
         SourceLang::Rust => "rust",
+        SourceLang::TypeScript => "typescript",
+        SourceLang::Baml => "baml",
         SourceLang::Markdown => "markdown",
         SourceLang::Toml => "toml",
         SourceLang::Yaml => "yaml",

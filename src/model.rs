@@ -10,6 +10,8 @@ pub enum SourceLang {
     Shell,
     Nushell,
     Rust,
+    TypeScript,
+    Baml,
     Markdown,
     Toml,
     Yaml,

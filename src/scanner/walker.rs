@@ -9,6 +9,8 @@ fn lang_from_ext(ext: &str) -> SourceLang {
         "sh" | "bash" => SourceLang::Shell,
         "nu" => SourceLang::Nushell,
         "rs" => SourceLang::Rust,
+        "ts" | "tsx" => SourceLang::TypeScript,
+        "baml" => SourceLang::Baml,
         "md" => SourceLang::Markdown,
         "toml" => SourceLang::Toml,
         "yaml" | "yml" => SourceLang::Yaml,
