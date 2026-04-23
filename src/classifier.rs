@@ -147,6 +147,7 @@ pub mod rules {
     /// - `type_declaration`    — tree-sitter-go (all versions)
     /// - `function_definition` — tree-sitter-python, tree-sitter-bash
     /// - `function_declaration`— tree-sitter-go
+    /// - `function_item`       — tree-sitter-rust (all versions); covers `fn` and `async fn`
     /// - `struct_item`, `enum_item`, `impl_item` — tree-sitter-rust (all versions)
     pub fn is_domain_logic(parsed: &ParsedFile) -> bool {
         parsed.top_level_kinds.iter().any(|k| {
@@ -155,6 +156,7 @@ pub mod rules {
                 || k == "struct_item"
                 || k == "enum_item"
                 || k == "impl_item"
+                || k == "function_item"
                 || k == "function_definition"
                 || k == "function_declaration"
                 || k == "decorated_definition"
