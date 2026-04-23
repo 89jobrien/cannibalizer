@@ -24,6 +24,16 @@ static IGNORED_DIRS: &[&str] = &[
     "__pycache__",
     ".venv",
     "dist",
+    // stale / archived source trees
+    "_archive",
+    "_old",
+    "_deprecated",
+    "_backup",
+    "archive",
+    "old",
+    "deprecated",
+    "backup",
+    ".archive",
 ];
 
 static IGNORED_FILES: &[&str] = &[
@@ -151,6 +161,23 @@ mod tests {
         assert!(has("Toml"));
         assert!(has("Markdown"));
         assert!(has("Json"));
+    }
+
+    #[test]
+    fn skips_archive_directories() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        touch(root, "src/main.rs");
+        touch(root, "_archive/src/main.rs");
+        touch(root, "_old/service.py");
+        touch(root, "archive/lib.go");
+        touch(root, "deprecated/adapter.rs");
+        touch(root, ".archive/old.rs");
+
+        let results: Vec<_> = walk(root).collect();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].0.ends_with("src/main.rs"));
     }
 
     #[test]

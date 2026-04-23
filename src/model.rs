@@ -28,6 +28,8 @@ pub enum ItemKind {
     Script,
     Spec,
     Config,
+    /// Pure dispatch / glue file — only `use`, `mod`, re-exports; no owned logic.
+    Glue,
     Discard,
 }
 
@@ -118,6 +120,13 @@ mod tests {
     #[test]
     fn round_trip_config() {
         let item = make_item(ItemKind::Config);
+        let rt = round_trip(&item);
+        assert_eq!(format!("{:?}", item.kind), format!("{:?}", rt.kind));
+    }
+
+    #[test]
+    fn round_trip_glue() {
+        let item = make_item(ItemKind::Glue);
         let rt = round_trip(&item);
         assert_eq!(format!("{:?}", item.kind), format!("{:?}", rt.kind));
     }

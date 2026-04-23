@@ -57,7 +57,7 @@ pub mod rules {
             || s.contains("/inbox/")
     }
 
-    /// Rule 8 – path contains "main" or "cmd", or top_level_kinds has a
+    /// Rule 8 – path stem is "main" or a segment is "cmd", or top_level_kinds has a
     /// function named "main" → Entrypoint.
     ///
     /// We detect the latter by checking for `function_definition` or
@@ -65,8 +65,16 @@ pub mod rules {
     /// appearing in the raw source.  This is a heuristic, not a full AST
     /// walk, but it is consistent with the no-I/O contract of the classifier.
     pub fn is_entrypoint(parsed: &ParsedFile, path: &Path) -> bool {
+        // Check file stem exactly rather than substring to avoid "domain" ⊃ "main".
+        let stem = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if stem == "main" {
+            return true;
+        }
         let s = path.to_string_lossy().to_lowercase();
-        if s.contains("main") || s.contains("/cmd/") || s.contains("/cmd.") {
+        if s.contains("/cmd/") || s.contains("/cmd.") {
             return true;
         }
         let has_main_func = parsed
@@ -75,6 +83,33 @@ pub mod rules {
             .any(|k| k == "function_definition" || k == "function_declaration");
         has_main_func && parsed.raw_source.contains("def main")
             || parsed.raw_source.contains("func main(")
+    }
+
+    /// Rule 9a – all top-level nodes are pure dispatch (use / mod / extern crate) → Glue.
+    ///
+    /// A file is glue when it has *only* `use_declaration`, `mod_item`, or
+    /// `extern_crate_declaration` nodes (or no nodes at all but the file is
+    /// named `lib.rs`, `mod.rs`, or `app.rs`).  The empty-kinds guard prevents
+    /// misclassifying truly unknown files as Glue.
+    pub fn is_glue(parsed: &ParsedFile, path: &Path) -> bool {
+        let dispatch_kinds = ["use_declaration", "mod_item", "extern_crate_declaration"];
+        let all_dispatch = !parsed.top_level_kinds.is_empty()
+            && parsed
+                .top_level_kinds
+                .iter()
+                .all(|k| dispatch_kinds.contains(&k.as_str()));
+        if all_dispatch {
+            return true;
+        }
+        // Empty-parse heuristic: known glue filenames with no parsed kinds
+        if parsed.top_level_kinds.is_empty() {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            return matches!(name.as_str(), "lib.rs" | "mod.rs" | "app.rs");
+        }
+        false
     }
 
     /// Rule 9 – top_level_kinds contains class / type / struct / enum / impl → DomainLogic
@@ -126,6 +161,10 @@ pub fn classify(parsed: &ParsedFile, path: &Path) -> ItemKind {
     // 9
     if rules::is_domain_logic(parsed) {
         return ItemKind::DomainLogic;
+    }
+    // 9a
+    if rules::is_glue(parsed, path) {
+        return ItemKind::Glue;
     }
     // 10 fallback
     ItemKind::Discard
@@ -264,6 +303,58 @@ mod tests {
     #[test]
     fn struct_item_gives_domain_logic() {
         let (p, path) = make_parsed("src/model.rs", SourceLang::Rust, vec!["struct_item"], "");
+        assert!(matches!(classify(&p, &path), ItemKind::DomainLogic));
+    }
+
+    #[test]
+    fn only_use_mod_kinds_gives_glue() {
+        // top_level_kinds contains only dispatch nodes → Glue
+        let (p, path) = make_parsed(
+            "src/lib.rs",
+            SourceLang::Rust,
+            vec!["use_declaration", "mod_item"],
+            "use std::fmt;\nmod inner;",
+        );
+        assert!(matches!(classify(&p, &path), ItemKind::Glue));
+    }
+
+    #[test]
+    fn lib_rs_with_empty_kinds_gives_glue() {
+        // lib.rs that the parser emitted no top_level_kinds for → Glue by filename
+        let (p, path) = make_parsed("src/lib.rs", SourceLang::Rust, vec![], "");
+        assert!(matches!(classify(&p, &path), ItemKind::Glue));
+    }
+
+    #[test]
+    fn mod_rs_with_empty_kinds_gives_glue() {
+        // mod.rs outside an adapter path → Glue by filename
+        // (avoid paths containing "domain" since "domain" ⊃ "main" — rule 8 would fire first)
+        let (p, path) = make_parsed("src/core/mod.rs", SourceLang::Rust, vec![], "");
+        assert!(matches!(classify(&p, &path), ItemKind::Glue));
+    }
+
+    #[test]
+    fn inbox_mod_rs_gives_adapter_not_glue() {
+        // /inbox/ in path triggers rule 7 (Adapter) before glue rule — correct
+        let (p, path) = make_parsed("src/inbox/mod.rs", SourceLang::Rust, vec![], "");
+        assert!(matches!(classify(&p, &path), ItemKind::Adapter));
+    }
+
+    #[test]
+    fn app_rs_with_empty_kinds_gives_glue() {
+        let (p, path) = make_parsed("src/app.rs", SourceLang::Rust, vec![], "");
+        assert!(matches!(classify(&p, &path), ItemKind::Glue));
+    }
+
+    #[test]
+    fn mixed_kinds_does_not_give_glue() {
+        // Has a struct alongside use_declaration → DomainLogic, not Glue
+        let (p, path) = make_parsed(
+            "src/service.rs",
+            SourceLang::Rust,
+            vec!["use_declaration", "struct_item"],
+            "",
+        );
         assert!(matches!(classify(&p, &path), ItemKind::DomainLogic));
     }
 

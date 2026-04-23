@@ -103,6 +103,7 @@ fn kind_label(kind: &ItemKind) -> &'static str {
         ItemKind::Script => "script",
         ItemKind::Spec => "spec",
         ItemKind::Config => "config",
+        ItemKind::Glue => "glue",
         ItemKind::Discard => "discard",
     }
 }
