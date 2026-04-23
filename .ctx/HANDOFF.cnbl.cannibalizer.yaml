@@ -1,31 +1,19 @@
 project: cnbl
-updated: 20260423::031525
-
+id: cnbl
+updated: 2026-04-23
 items:
-  - id: 1
-    title: "P0 sprint: define discard classification more precisely"
-    description: >
-      The current discard fallback (rule 10) catches everything that doesn't match
-      a structural or path rule. During a live scan of kan, the following were wrongly
-      or ambiguously classified as discard: app.rs, lib.rs, inbox/mod.rs (dispatch/glue
-      files with only `use` and `mod` declarations). Need to decide: should these be
-      classified as a new kind (e.g. Glue/Dispatch), promoted to DomainLogic, or left
-      as Discard? Also: the duplicate src/ flat layout in kan was scanned alongside the
-      hexagonal kan-cli/kan-core/kan-adapters layout — scanner has no way to skip
-      stale/archived source trees. Define the correct behavior for each case and update
-      classifier rules + tests accordingly.
-    priority: P0
-    status: open
-    files:
-      - src/classifier.rs
-      - src/scanner/walker.rs
-
 log:
+  - date: 20260423::session2
+    summary: |
+      P0 sprint complete. Added ItemKind::Glue for pure dispatch files (lib.rs, mod.rs, app.rs,
+      or files with only use/mod/extern_crate top-level nodes). Fixed rule 8 entrypoint detection
+      to use file stem equality instead of substring match (was misclassifying any file in
+      domain/ as Entrypoint). Extended walker IGNORED_DIRS with 9 archive dir patterns. 74 tests
+      passing. Commit: dcc6be1.
+    commits: [dcc6be1]
+    session: 2
   - date: 20260423::031525
-    session: 1
-    summary: >
-      Cloned repo, renamed exec→eat, updated CLI descriptions. Added tree-sitter-rust
-      grammar, fixed Rust struct/trait/enum/impl classification, expanded adapter path
-      rules (store_, source_, /inbox/). All 66 tests passing. Ran live scan against
-      kan — classification working but discard definition needs sprint.
+    summary: |
+      Cloned repo, renamed exec→eat, updated CLI descriptions. Added tree-sitter-rust grammar, fixed Rust struct/trait/enum/impl classification, expanded adapter path rules (store_, source_, /inbox/). All 66 tests passing. Ran live scan against kan — classification working but discard definition needs sprint.
     commits: []
+    session: 1
