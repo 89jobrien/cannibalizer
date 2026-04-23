@@ -28,6 +28,8 @@ static IGNORED_DIRS: &[&str] = &[
     "dist",
     // git worktrees — never scan these; they duplicate the main tree
     ".worktrees",
+    // claude Code agent worktrees live under .claude/worktrees/
+    ".claude",
     // stale / archived source trees — underscore-prefixed convention only.
     // Bare words like "old", "backup", "deprecated" are intentionally excluded:
     // they are plausible real directory names in active codebases (benchmark dirs,

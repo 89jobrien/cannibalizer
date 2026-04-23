@@ -99,6 +99,7 @@ pub mod rules {
     /// Dispatch-only node kinds across all supported grammars.
     ///
     /// Rust:   use_declaration, mod_item, extern_crate_declaration
+    ///         line_comment, block_comment (//! and /* */ doc headers)
     /// Python: import_statement, import_from_statement
     const DISPATCH_KINDS: &[&str] = &[
         "use_declaration",
@@ -106,6 +107,8 @@ pub mod rules {
         "extern_crate_declaration",
         "import_statement",
         "import_from_statement",
+        "line_comment",
+        "block_comment",
     ];
 
     /// Rule 9a – all top-level nodes are pure dispatch (use / mod / extern crate /
@@ -118,12 +121,17 @@ pub mod rules {
             .map(|n| n.to_string_lossy().to_lowercase())
             .unwrap_or_default();
 
-        // Empty-parse heuristic: known glue filenames
+        // Empty-parse heuristic: known glue filenames, or any Rust file that
+        // parsed to zero top-level kinds (empty stubs, BAML-generated placeholders,
+        // comment-only files).
         if parsed.top_level_kinds.is_empty() {
-            return matches!(
+            if matches!(
                 name.as_str(),
                 "lib.rs" | "mod.rs" | "app.rs" | "__init__.py"
-            );
+            ) {
+                return true;
+            }
+            return matches!(parsed.lang, crate::model::SourceLang::Rust);
         }
 
         // All top-level nodes are dispatch-only → Glue
@@ -148,6 +156,8 @@ pub mod rules {
     /// - `function_definition` — tree-sitter-python, tree-sitter-bash
     /// - `function_declaration`— tree-sitter-go
     /// - `function_item`       — tree-sitter-rust (all versions); covers `fn` and `async fn`
+    /// - `const_item`          — tree-sitter-rust; named constants and SQL query banks
+    /// - `static_item`         — tree-sitter-rust; static values
     /// - `struct_item`, `enum_item`, `impl_item` — tree-sitter-rust (all versions)
     pub fn is_domain_logic(parsed: &ParsedFile) -> bool {
         parsed.top_level_kinds.iter().any(|k| {
@@ -157,6 +167,8 @@ pub mod rules {
                 || k == "enum_item"
                 || k == "impl_item"
                 || k == "function_item"
+                || k == "const_item"
+                || k == "static_item"
                 || k == "function_definition"
                 || k == "function_declaration"
                 || k == "decorated_definition"
