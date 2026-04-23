@@ -27,18 +27,28 @@ fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
 
     match args.command {
-        cli::Command::Scan { path, output, report } => {
-            cmd::scan::run(&path, output.as_deref(), report)
-        }
-        cli::Command::Plan { repo_map, input, dry_run } => {
+        cli::Command::Scan {
+            path,
+            output,
+            report,
+        } => cmd::scan::run(&path, output.as_deref(), report),
+        cli::Command::Plan {
+            repo_map,
+            input,
+            dry_run,
+        } => {
             let repo_map = repo_map.unwrap_or_else(default_repo_map);
             cmd::plan::run(input.as_deref(), &repo_map, dry_run)
         }
-        cli::Command::Gen { input, out_dir, force } => {
+        cli::Command::Gen {
+            input,
+            out_dir,
+            force,
+        } => {
             let out_dir = out_dir.unwrap_or_else(|| PathBuf::from("cnbl-output"));
             cmd::scaffold::run(input.as_deref(), &out_dir, force)
         }
-        cli::Command::Exec {
+        cli::Command::Eat {
             input,
             scaffold_dir,
             repo_root,
@@ -50,7 +60,7 @@ fn main() -> anyhow::Result<()> {
             let repo_root = repo_root.unwrap_or_else(default_dev_dir);
             let vault_dir = vault_dir.unwrap_or_else(default_vault_dir);
             let source_repo_name = source_repo.unwrap_or_else(|| "unknown".to_string());
-            let cfg = cmd::exec::ExecConfig {
+            let cfg = cmd::eat::EatConfig {
                 input: input.as_deref(),
                 scaffold_dir: &scaffold_dir,
                 repo_root: &repo_root,
@@ -58,7 +68,7 @@ fn main() -> anyhow::Result<()> {
                 source_repo_name: &source_repo_name,
                 dry_run,
             };
-            cmd::exec::run(&cfg)
+            cmd::eat::run(&cfg)
         }
     }
 }

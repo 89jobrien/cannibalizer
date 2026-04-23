@@ -44,6 +44,7 @@ pub fn parse_file(path: &Path, lang: SourceLang) -> anyhow::Result<ParsedFile> {
         SourceLang::Python => Some(tree_sitter_python::LANGUAGE.into()),
         SourceLang::Go => Some(tree_sitter_go::LANGUAGE.into()),
         SourceLang::Shell => Some(tree_sitter_bash::LANGUAGE.into()),
+        SourceLang::Rust => Some(tree_sitter_rust::LANGUAGE.into()),
         _ => None,
     };
 
@@ -53,9 +54,9 @@ pub fn parse_file(path: &Path, lang: SourceLang) -> anyhow::Result<ParsedFile> {
             .set_language(&ts_lang)
             .map_err(|e| anyhow::anyhow!("failed to set language: {e}"))?;
 
-        let tree = parser
-            .parse(raw_source.as_bytes(), None)
-            .ok_or_else(|| anyhow::anyhow!("tree-sitter returned no tree for {}", path.display()))?;
+        let tree = parser.parse(raw_source.as_bytes(), None).ok_or_else(|| {
+            anyhow::anyhow!("tree-sitter returned no tree for {}", path.display())
+        })?;
 
         let root = tree.root_node();
         let mut cursor = root.walk();
@@ -176,5 +177,46 @@ mod tests {
     fn parse_missing_file_returns_err() {
         let result = parse_file(Path::new("/nonexistent/path/file.py"), SourceLang::Python);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_rust_struct_emits_struct_item() {
+        use std::io::Write as _;
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        writeln!(tmp, "pub struct Foo {{ pub x: u32 }}").unwrap();
+        let result = parse_file(tmp.path(), SourceLang::Rust).unwrap();
+        assert!(
+            result.top_level_kinds.iter().any(|k| k == "struct_item"),
+            "expected struct_item, got {:?}",
+            result.top_level_kinds
+        );
+    }
+
+    #[test]
+    fn parse_rust_trait_emits_trait_item() {
+        use std::io::Write as _;
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        writeln!(tmp, "pub trait MyPort {{ fn do_it(&self); }}").unwrap();
+        let result = parse_file(tmp.path(), SourceLang::Rust).unwrap();
+        assert!(
+            result.top_level_kinds.iter().any(|k| k == "trait_item"),
+            "expected trait_item, got {:?}",
+            result.top_level_kinds
+        );
+    }
+
+    #[test]
+    fn parse_rust_actual_model_file() {
+        let path = std::path::PathBuf::from("/Users/joe/dev/kan/kan-core/src/model.rs");
+        if !path.exists() {
+            return;
+        }
+        let result = parse_file(&path, SourceLang::Rust).unwrap();
+        eprintln!("kan model.rs kinds: {:?}", result.top_level_kinds);
+        assert!(
+            result.top_level_kinds.iter().any(|k| k == "struct_item"),
+            "expected struct_item, got {:?}",
+            result.top_level_kinds
+        );
     }
 }

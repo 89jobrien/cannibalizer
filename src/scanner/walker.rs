@@ -144,9 +144,7 @@ mod tests {
         touch(root, "data.json");
 
         let results: Vec<_> = walk(root).collect();
-        let has = |l: &str| {
-            results.iter().any(|(_, lang)| format!("{lang:?}") == l)
-        };
+        let has = |l: &str| results.iter().any(|(_, lang)| format!("{lang:?}") == l);
         assert!(has("Python"));
         assert!(has("Go"));
         assert!(has("Shell"));

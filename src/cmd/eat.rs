@@ -1,4 +1,4 @@
-//! `cnbl exec` — apply a migration plan: copy scaffolds and archive files.
+//! `cnbl eat` — copy stubs into your repos and archive the originals.
 
 use std::{
     io::{self, BufRead},
@@ -13,7 +13,7 @@ use crate::ecosystem::{Destination, RouteDecision};
 // COMMAND
 // ============================================================================
 
-pub struct ExecConfig<'a> {
+pub struct EatConfig<'a> {
     pub input: Option<&'a Path>,
     pub scaffold_dir: &'a Path,
     pub repo_root: &'a Path,
@@ -22,7 +22,7 @@ pub struct ExecConfig<'a> {
     pub dry_run: bool,
 }
 
-pub fn run(cfg: &ExecConfig<'_>) -> anyhow::Result<()> {
+pub fn run(cfg: &EatConfig<'_>) -> anyhow::Result<()> {
     let decisions = read_plan(cfg.input)?;
 
     let mut errors: Vec<String> = Vec::new();
@@ -35,10 +35,7 @@ pub fn run(cfg: &ExecConfig<'_>) -> anyhow::Result<()> {
                 // Strip leading `/` so absolute paths become relative when
                 // appended to the vault root.
                 let rel = src.strip_prefix("/").unwrap_or(src);
-                let dest = cfg
-                    .vault_dir
-                    .join(cfg.source_repo_name)
-                    .join(rel);
+                let dest = cfg.vault_dir.join(cfg.source_repo_name).join(rel);
                 if cfg.dry_run {
                     println!("archive  {}  →  {}", src.display(), dest.display());
                 } else {
@@ -49,20 +46,38 @@ pub fn run(cfg: &ExecConfig<'_>) -> anyhow::Result<()> {
                     }
                 }
             }
-            Destination::ExistingRepo { name, .. } | Destination::NewCrate { suggested_name: name } => {
+            Destination::ExistingRepo { name, .. }
+            | Destination::NewCrate {
+                suggested_name: name,
+            } => {
                 let scaffold_src = cfg.scaffold_dir.join(name);
                 let repo_dest = cfg.repo_root.join(name);
                 if !repo_dest.exists() {
-                    eprintln!("warn: skipping '{}' — not found at {}", name, repo_dest.display());
+                    eprintln!(
+                        "warn: skipping '{}' — not found at {}",
+                        name,
+                        repo_dest.display()
+                    );
                     continue;
                 }
                 if cfg.dry_run {
-                    println!("copy scaffold  {}  →  {}", scaffold_src.display(), repo_dest.display());
+                    println!(
+                        "copy scaffold  {}  →  {}",
+                        scaffold_src.display(),
+                        repo_dest.display()
+                    );
                 } else {
-                    eprintln!("  copy {} → {}", scaffold_src.display(), repo_dest.display());
+                    eprintln!(
+                        "  copy {} → {}",
+                        scaffold_src.display(),
+                        repo_dest.display()
+                    );
                     match copy_dir_all(&scaffold_src, &repo_dest) {
-                        Ok(()) => actions_taken.push(format!("copied scaffold to {}", repo_dest.display())),
-                        Err(e) => errors.push(format!("copy scaffold to {}: {e}", repo_dest.display())),
+                        Ok(()) => actions_taken
+                            .push(format!("copied scaffold to {}", repo_dest.display())),
+                        Err(e) => {
+                            errors.push(format!("copy scaffold to {}: {e}", repo_dest.display()))
+                        }
                     }
                 }
             }
@@ -138,8 +153,8 @@ fn copy_dir_all(src: &Path, dest: &Path) -> anyhow::Result<()> {
     }
     std::fs::create_dir_all(dest)
         .with_context(|| format!("cannot create dir: {}", dest.display()))?;
-    for entry in std::fs::read_dir(src)
-        .with_context(|| format!("cannot read dir: {}", src.display()))?
+    for entry in
+        std::fs::read_dir(src).with_context(|| format!("cannot read dir: {}", src.display()))?
     {
         let entry = entry?;
         let file_type = entry.file_type()?;
@@ -208,7 +223,7 @@ mod tests {
         let repo_root = tmp.path().join("repos");
         let vault_dir = tmp.path().join("vault");
 
-        let cfg = ExecConfig {
+        let cfg = EatConfig {
             input: Some(&plan_file),
             scaffold_dir: &scaffold_dir,
             repo_root: &repo_root,
@@ -254,7 +269,7 @@ mod tests {
         let scaffold_dir = tmp.path().join("scaffold");
         let repo_root = tmp.path().join("repos");
 
-        let cfg = ExecConfig {
+        let cfg = EatConfig {
             input: Some(&plan_file),
             scaffold_dir: &scaffold_dir,
             repo_root: &repo_root,
@@ -267,6 +282,10 @@ mod tests {
 
         let rel = src_file.strip_prefix("/").unwrap_or(&src_file);
         let expected = vault_dir.join("my-repo").join(rel);
-        assert!(expected.exists(), "vault copy should exist at {}", expected.display());
+        assert!(
+            expected.exists(),
+            "vault copy should exist at {}",
+            expected.display()
+        );
     }
 }

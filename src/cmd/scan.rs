@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 
 use crate::{
     classifier,
@@ -55,9 +55,7 @@ pub fn run(root: &Path, out_path: Option<&Path>, report: bool) -> anyhow::Result
             .unwrap_or(&abs_path)
             .to_path_buf();
 
-        let size_bytes = std::fs::metadata(&abs_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let size_bytes = std::fs::metadata(&abs_path).map(|m| m.len()).unwrap_or(0);
 
         let parsed = match parse_file(&abs_path, lang) {
             Ok(p) => p,
@@ -151,10 +149,7 @@ pub fn print_report(items: &[HarvestItem], total: u64, skipped: u64, elapsed: f6
         let kl = kind_label(&item.kind);
         *counts.entry(kl).or_insert(0) += 1;
         let ll = lang_label(&item.lang);
-        langs_by_kind
-            .entry(kl)
-            .or_default()
-            .push(ll);
+        langs_by_kind.entry(kl).or_default().push(ll);
         if matches!(item.kind, ItemKind::Discard) {
             discards.push(item);
         }
@@ -204,8 +199,8 @@ pub fn print_report(items: &[HarvestItem], total: u64, skipped: u64, elapsed: f6
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::model::SourceLang;
+    use std::path::PathBuf;
 
     fn make_item(kind: ItemKind, lang: SourceLang, path: &str) -> HarvestItem {
         HarvestItem {
@@ -267,8 +262,8 @@ mod tests {
         let content = std::fs::read_to_string(tmp.path()).unwrap();
         // Each line should be valid JSON
         for line in content.lines() {
-            let parsed: serde_json::Value = serde_json::from_str(line)
-                .expect("each output line should be valid JSON");
+            let parsed: serde_json::Value =
+                serde_json::from_str(line).expect("each output line should be valid JSON");
             assert!(parsed.get("kind").is_some());
         }
     }

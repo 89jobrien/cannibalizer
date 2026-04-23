@@ -36,11 +36,7 @@ pub struct PlanSummary {
 // COMMAND
 // ============================================================================
 
-pub fn run(
-    input: Option<&Path>,
-    repo_map: &Path,
-    dry_run: bool,
-) -> anyhow::Result<()> {
+pub fn run(input: Option<&Path>, repo_map: &Path, dry_run: bool) -> anyhow::Result<()> {
     let repos = ecosystem::load_repos(repo_map)?;
     let items = read_harvest_items(input)?;
     let decisions: Vec<RouteDecision> = items
@@ -49,7 +45,10 @@ pub fn run(
         .collect();
 
     let summary = build_summary(&decisions);
-    let plan = MigrationPlan { items: decisions, summary };
+    let plan = MigrationPlan {
+        items: decisions,
+        summary,
+    };
 
     if dry_run {
         print_dry_run(&plan);
@@ -136,7 +135,8 @@ fn print_summary_stderr(plan: &MigrationPlan) {
         .collect();
 
     // Per-repo counts.
-    let mut repo_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut repo_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
     for d in &plan.items {
         if let Destination::ExistingRepo { name, .. } = &d.destination {
             *repo_counts.entry(name.clone()).or_insert(0) += 1;
@@ -147,19 +147,37 @@ fn print_summary_stderr(plan: &MigrationPlan) {
     repo_names.sort();
     for name in repo_names {
         let count = repo_counts[name];
-        eprintln!("→ {name:<16} {count} item{}", if count == 1 { "" } else { "s" });
+        eprintln!(
+            "→ {name:<16} {count} item{}",
+            if count == 1 { "" } else { "s" }
+        );
     }
 
     if s.archive > 0 {
-        eprintln!("→ {:<16} {} item{}", "archive", s.archive, if s.archive == 1 { "" } else { "s" });
+        eprintln!(
+            "→ {:<16} {} item{}",
+            "archive",
+            s.archive,
+            if s.archive == 1 { "" } else { "s" }
+        );
     }
     if s.discard > 0 {
-        eprintln!("→ {:<16} {} item{}", "discard", s.discard, if s.discard == 1 { "" } else { "s" });
+        eprintln!(
+            "→ {:<16} {} item{}",
+            "discard",
+            s.discard,
+            if s.discard == 1 { "" } else { "s" }
+        );
     }
     if s.new_crate > 0 {
         let names_str = new_crate_names.join(", ");
-        eprintln!("→ {:<16} {} item{}  (suggested: {})", "new crate", s.new_crate,
-            if s.new_crate == 1 { "" } else { "s" }, names_str);
+        eprintln!(
+            "→ {:<16} {} item{}  (suggested: {})",
+            "new crate",
+            s.new_crate,
+            if s.new_crate == 1 { "" } else { "s" },
+            names_str
+        );
     }
 }
 
@@ -186,11 +204,13 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{ecosystem::EcosystemRepo, model::{ItemKind, SourceLang}};
+    use crate::{
+        ecosystem::EcosystemRepo,
+        model::{ItemKind, SourceLang},
+    };
 
     fn make_repos() -> Vec<EcosystemRepo> {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/repos.json");
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/repos.json");
         ecosystem::load_repos(&path).unwrap()
     }
 

@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[command(name = "cnbl", about = "Absorb foreign repos into the Rust ecosystem")]
+#[command(
+    name = "cnbl",
+    about = "Turn any repo into Rust — scan, plan, scaffold, absorb"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -11,73 +14,73 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Scan a foreign repository and classify its files
+    /// Walk a foreign repo and figure out what's in it (outputs JSONL)
     Scan {
-        /// Path to the repository root to scan
+        /// Path to the repo you want to cannibalize
         path: PathBuf,
 
-        /// Write output to this file (default: stdout)
+        /// Save the JSONL output to a file instead of printing it
         #[arg(long, value_name = "FILE")]
         output: Option<PathBuf>,
 
-        /// Print a human-readable harvest report to stderr after the JSONL stream
+        /// Also print a summary table showing what was found
         #[arg(long)]
         report: bool,
     },
 
-    /// Route classified harvest items to ecosystem destinations
+    /// Decide where each file should go in your Rust ecosystem (outputs JSONL)
     Plan {
-        /// Path to repos.json repo-map file
+        /// Path to your repos.json ecosystem map (default: ~/dev/bazaar/repos.json)
         #[arg(long, value_name = "FILE")]
         repo_map: Option<PathBuf>,
 
-        /// Read harvest JSONL from this file instead of stdin
+        /// Read scan output from a file instead of stdin
         #[arg(long, value_name = "FILE")]
         input: Option<PathBuf>,
 
-        /// Print a human-readable plan table instead of JSONL
+        /// Show the routing decisions as a table without writing any output
         #[arg(long)]
         dry_run: bool,
     },
 
-    /// Generate hexagonal scaffold stubs from a migration plan
+    /// Create empty Rust stubs for everything that needs to be ported
     Gen {
-        /// Read plan JSONL from this file instead of stdin
+        /// Read plan output from a file instead of stdin
         #[arg(long, value_name = "FILE")]
         input: Option<PathBuf>,
 
-        /// Directory to write generated output into (default: ./cnbl-output)
+        /// Where to write the generated stubs (default: ./cnbl-output)
         #[arg(long, value_name = "DIR")]
         out_dir: Option<PathBuf>,
 
-        /// Overwrite existing files without aborting
+        /// Replace existing files if they already exist
         #[arg(long)]
         force: bool,
     },
 
-    /// Execute a migration plan: copy scaffolds and archive files
-    Exec {
-        /// Read plan JSONL from this file instead of stdin
+    /// Copy stubs into your repos and archive the originals — this does the actual work
+    Eat {
+        /// Read plan output from a file instead of stdin
         #[arg(long, value_name = "FILE")]
         input: Option<PathBuf>,
 
-        /// Directory containing cnbl gen output (default: ./cnbl-output)
+        /// Where the generated stubs live (default: ./cnbl-output)
         #[arg(long, value_name = "DIR")]
         scaffold_dir: Option<PathBuf>,
 
-        /// Root directory where local repos live (default: ~/dev)
+        /// Root directory where your local repos live (default: ~/dev)
         #[arg(long, value_name = "DIR")]
         repo_root: Option<PathBuf>,
 
-        /// Vault directory for archived files
+        /// Where to archive files that aren't being ported
         #[arg(long, value_name = "DIR")]
         vault_dir: Option<PathBuf>,
 
-        /// Name of the source repo being cannibalized
+        /// Name of the repo being cannibalized
         #[arg(long, value_name = "NAME")]
         source_repo: Option<String>,
 
-        /// Print what would be done without doing anything
+        /// Show what would happen without touching anything
         #[arg(long)]
         dry_run: bool,
     },

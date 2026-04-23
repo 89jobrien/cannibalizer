@@ -42,7 +42,10 @@ pub struct RouteDecision {
 /// file is missing rather than propagating an error.
 pub fn load_repos(path: &Path) -> anyhow::Result<Vec<EcosystemRepo>> {
     if !path.exists() {
-        eprintln!("warn: repo-map not found at {}, using empty list", path.display());
+        eprintln!(
+            "warn: repo-map not found at {}, using empty list",
+            path.display()
+        );
         return Ok(vec![]);
     }
     let raw = std::fs::read_to_string(path)
@@ -69,7 +72,10 @@ fn score_repo(repo: &EcosystemRepo, keywords: &[&str]) -> usize {
 
 /// Find the best-matching repo for a set of keywords. Returns `None` if no
 /// repo scores above zero.
-pub fn domain_match<'a>(keywords: &[&str], repos: &'a [EcosystemRepo]) -> Option<&'a EcosystemRepo> {
+pub fn domain_match<'a>(
+    keywords: &[&str],
+    repos: &'a [EcosystemRepo],
+) -> Option<&'a EcosystemRepo> {
     repos
         .iter()
         .map(|r| (r, score_repo(r, keywords)))
@@ -106,13 +112,30 @@ pub fn route(item: HarvestItem, repos: &[EcosystemRepo]) -> RouteDecision {
             };
         }
         ItemKind::Script => {
-            if path_str.contains("harvest") || path_str.contains("sync") || path_str.contains("ingest") {
-                return repo_decision(item, "harvestrs", repos, "script path matches harvest/sync/ingest");
+            if path_str.contains("harvest")
+                || path_str.contains("sync")
+                || path_str.contains("ingest")
+            {
+                return repo_decision(
+                    item,
+                    "harvestrs",
+                    repos,
+                    "script path matches harvest/sync/ingest",
+                );
             }
-            if path_str.contains("hook") || path_str.contains("course") || path_str.contains("block") {
-                return repo_decision(item, "coursers", repos, "script path matches hook/course/block");
+            if path_str.contains("hook")
+                || path_str.contains("course")
+                || path_str.contains("block")
+            {
+                return repo_decision(
+                    item,
+                    "coursers",
+                    repos,
+                    "script path matches hook/course/block",
+                );
             }
-            if path_str.contains("fmt") || path_str.contains("format") || path_str.contains("lint") {
+            if path_str.contains("fmt") || path_str.contains("format") || path_str.contains("lint")
+            {
                 return repo_decision(item, "fmtx", repos, "script path matches fmt/format/lint");
             }
             return RouteDecision {
@@ -157,7 +180,9 @@ pub fn route(item: HarvestItem, repos: &[EcosystemRepo]) -> RouteDecision {
         .replace('-', "_");
 
     RouteDecision {
-        destination: Destination::NewCrate { suggested_name: suggested.clone() },
+        destination: Destination::NewCrate {
+            suggested_name: suggested.clone(),
+        },
         rationale: format!("no ecosystem match; suggested new crate '{suggested}'"),
         item,
     }
@@ -165,7 +190,12 @@ pub fn route(item: HarvestItem, repos: &[EcosystemRepo]) -> RouteDecision {
 
 /// Helper: look up a named repo and build an ExistingRepo destination, or fall
 /// back to NewCrate if the repo isn't in the list.
-fn repo_decision(item: HarvestItem, repo_name: &str, repos: &[EcosystemRepo], rationale: &str) -> RouteDecision {
+fn repo_decision(
+    item: HarvestItem,
+    repo_name: &str,
+    repos: &[EcosystemRepo],
+    rationale: &str,
+) -> RouteDecision {
     if let Some(repo) = repos.iter().find(|r| r.name == repo_name) {
         RouteDecision {
             destination: Destination::ExistingRepo {
@@ -198,8 +228,7 @@ mod tests {
     use crate::model::{ItemKind, SourceLang};
 
     fn fixture_repos() -> Vec<EcosystemRepo> {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/repos.json");
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/repos.json");
         load_repos(&path).unwrap()
     }
 
@@ -238,21 +267,27 @@ mod tests {
     fn harvest_script_routes_to_harvestrs() {
         let repos = fixture_repos();
         let d = route(item(ItemKind::Script, "scripts/harvest_notes.sh"), &repos);
-        assert!(matches!(d.destination, Destination::ExistingRepo { ref name, .. } if name == "harvestrs"));
+        assert!(
+            matches!(d.destination, Destination::ExistingRepo { ref name, .. } if name == "harvestrs")
+        );
     }
 
     #[test]
     fn hook_script_routes_to_coursers() {
         let repos = fixture_repos();
         let d = route(item(ItemKind::Script, "scripts/hook_block.sh"), &repos);
-        assert!(matches!(d.destination, Destination::ExistingRepo { ref name, .. } if name == "coursers"));
+        assert!(
+            matches!(d.destination, Destination::ExistingRepo { ref name, .. } if name == "coursers")
+        );
     }
 
     #[test]
     fn fmt_script_routes_to_fmtx() {
         let repos = fixture_repos();
         let d = route(item(ItemKind::Script, "tools/fmt_check.sh"), &repos);
-        assert!(matches!(d.destination, Destination::ExistingRepo { ref name, .. } if name == "fmtx"));
+        assert!(
+            matches!(d.destination, Destination::ExistingRepo { ref name, .. } if name == "fmtx")
+        );
     }
 
     #[test]
@@ -266,7 +301,9 @@ mod tests {
             notes: None,
         };
         let d = route(i, &repos);
-        assert!(matches!(d.destination, Destination::ExistingRepo { ref name, .. } if name == "doob"));
+        assert!(
+            matches!(d.destination, Destination::ExistingRepo { ref name, .. } if name == "doob")
+        );
     }
 
     #[test]

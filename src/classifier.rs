@@ -1,9 +1,6 @@
 use std::path::Path;
 
-use crate::{
-    model::ItemKind,
-    scanner::parser::ParsedFile,
-};
+use crate::{model::ItemKind, scanner::parser::ParsedFile};
 
 pub mod rules {
     use std::path::Path;
@@ -39,21 +36,25 @@ pub mod rules {
         )
     }
 
-    /// Rule 6 – top_level_kinds contains interface/protocol → Port
+    /// Rule 6 – top_level_kinds contains interface/protocol/trait → Port
     pub fn is_port(parsed: &ParsedFile) -> bool {
         parsed
             .top_level_kinds
             .iter()
-            .any(|k| k == "interface_type" || k == "protocol_stmt")
+            .any(|k| k == "interface_type" || k == "protocol_stmt" || k == "trait_item")
     }
 
-    /// Rule 7 – path contains adapter / integration / provider / backend → Adapter
+    /// Rule 7 – path contains adapter / integration / provider / backend /
+    ///           store / source_ / inbox → Adapter
     pub fn is_adapter(path: &Path) -> bool {
         let s = path.to_string_lossy().to_lowercase();
         s.contains("adapter")
             || s.contains("integration")
             || s.contains("provider")
             || s.contains("backend")
+            || s.contains("store_")
+            || s.contains("source_")
+            || s.contains("/inbox/")
     }
 
     /// Rule 8 – path contains "main" or "cmd", or top_level_kinds has a
@@ -72,13 +73,18 @@ pub mod rules {
             .top_level_kinds
             .iter()
             .any(|k| k == "function_definition" || k == "function_declaration");
-        has_main_func && parsed.raw_source.contains("def main") || parsed.raw_source.contains("func main(")
+        has_main_func && parsed.raw_source.contains("def main")
+            || parsed.raw_source.contains("func main(")
     }
 
-    /// Rule 9 – top_level_kinds contains class / type / struct → DomainLogic
+    /// Rule 9 – top_level_kinds contains class / type / struct / enum / impl → DomainLogic
     pub fn is_domain_logic(parsed: &ParsedFile) -> bool {
         parsed.top_level_kinds.iter().any(|k| {
-            k == "class_definition" || k == "type_declaration" || k == "struct_item"
+            k == "class_definition"
+                || k == "type_declaration"
+                || k == "struct_item"
+                || k == "enum_item"
+                || k == "impl_item"
         })
     }
 }
@@ -257,12 +263,7 @@ mod tests {
 
     #[test]
     fn struct_item_gives_domain_logic() {
-        let (p, path) = make_parsed(
-            "src/model.rs",
-            SourceLang::Rust,
-            vec!["struct_item"],
-            "",
-        );
+        let (p, path) = make_parsed("src/model.rs", SourceLang::Rust, vec!["struct_item"], "");
         assert!(matches!(classify(&p, &path), ItemKind::DomainLogic));
     }
 
@@ -276,7 +277,12 @@ mod tests {
     fn test_path_beats_fixture_path() {
         // "test" appears in path → TestHarness wins over fixture (which is also present)
         // but "fixture" appears too — since rule 1 runs first, TestHarness wins
-        let (p, path) = make_parsed("tests/fixtures/test_sample.py", SourceLang::Python, vec![], "");
+        let (p, path) = make_parsed(
+            "tests/fixtures/test_sample.py",
+            SourceLang::Python,
+            vec![],
+            "",
+        );
         assert!(matches!(classify(&p, &path), ItemKind::TestHarness));
     }
 
