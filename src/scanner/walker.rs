@@ -26,15 +26,15 @@ static IGNORED_DIRS: &[&str] = &[
     "__pycache__",
     ".venv",
     "dist",
-    // stale / archived source trees
+    // stale / archived source trees — underscore-prefixed convention only.
+    // Bare words like "old", "backup", "deprecated" are intentionally excluded:
+    // they are plausible real directory names in active codebases (benchmark dirs,
+    // API shim crates, migration tooling).  Use the underscore prefix to signal
+    // "this is intentionally stale" at the repo level.
     "_archive",
     "_old",
     "_deprecated",
     "_backup",
-    "archive",
-    "old",
-    "deprecated",
-    "backup",
     ".archive",
 ];
 
@@ -166,20 +166,38 @@ mod tests {
     }
 
     #[test]
-    fn skips_archive_directories() {
+    fn skips_underscore_prefixed_archive_directories() {
+        // Only underscore-prefixed names are skipped; bare words like "archive"
+        // and "deprecated" are intentionally walked (they may be real crate dirs).
         let tmp = TempDir::new().unwrap();
         let root = tmp.path();
 
         touch(root, "src/main.rs");
         touch(root, "_archive/src/main.rs");
         touch(root, "_old/service.py");
-        touch(root, "archive/lib.go");
-        touch(root, "deprecated/adapter.rs");
+        touch(root, "_deprecated/adapter.rs");
+        touch(root, "_backup/lib.rs");
         touch(root, ".archive/old.rs");
 
         let results: Vec<_> = walk(root).collect();
         assert_eq!(results.len(), 1);
         assert!(results[0].0.ends_with("src/main.rs"));
+    }
+
+    #[test]
+    fn does_not_skip_bare_word_archive_directories() {
+        // "archive", "deprecated", "old", "backup" are NOT skipped — they may be
+        // legitimate directory names in an active codebase.
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        touch(root, "src/main.rs");
+        touch(root, "archive/lib.go");
+        touch(root, "deprecated/adapter.rs");
+
+        let results: Vec<_> = walk(root).collect();
+        // src/main.rs + archive/lib.go + deprecated/adapter.rs = 3
+        assert_eq!(results.len(), 3);
     }
 
     #[test]

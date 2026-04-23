@@ -36,7 +36,13 @@ pub mod rules {
         )
     }
 
-    /// Rule 5b – TypeScript / TSX → DomainLogic (no tree-sitter grammar; classify by lang)
+    /// Rule 5b – TypeScript / TSX → DomainLogic (classify by lang, no structural analysis).
+    ///
+    /// TODO(tree-sitter-typescript): once tree-sitter-typescript is added as a dependency,
+    /// remove this rule and let rules 6–9 handle TypeScript structurally (ports via
+    /// `interface_declaration`, adapters via path, domain logic via `class_declaration` /
+    /// `function_declaration` / `arrow_function`).  Until then, all .ts/.tsx files are
+    /// conservatively promoted to DomainLogic rather than falling to Discard.
     pub fn is_typescript(parsed: &ParsedFile) -> bool {
         matches!(parsed.lang, SourceLang::TypeScript)
     }
@@ -90,52 +96,41 @@ pub mod rules {
             || parsed.raw_source.contains("func main(")
     }
 
-    /// Rule 9a – all top-level nodes are pure dispatch (use / mod / extern crate) → Glue.
+    /// Dispatch-only node kinds across all supported grammars.
     ///
-    /// A file is glue when it has *only* `use_declaration`, `mod_item`, or
-    /// `extern_crate_declaration` nodes (or no nodes at all but the file is
-    /// named `lib.rs`, `mod.rs`, or `app.rs`).  The empty-kinds guard prevents
-    /// misclassifying truly unknown files as Glue.
+    /// Rust:   use_declaration, mod_item, extern_crate_declaration
+    /// Python: import_statement, import_from_statement
+    const DISPATCH_KINDS: &[&str] = &[
+        "use_declaration",
+        "mod_item",
+        "extern_crate_declaration",
+        "import_statement",
+        "import_from_statement",
+    ];
+
+    /// Rule 9a – all top-level nodes are pure dispatch (use / mod / extern crate /
+    ///           import) → Glue, or file is a known glue filename with no parsed kinds.
+    ///
+    /// The empty-kinds guard prevents misclassifying truly unknown files as Glue.
     pub fn is_glue(parsed: &ParsedFile, path: &Path) -> bool {
-        let dispatch_kinds = ["use_declaration", "mod_item", "extern_crate_declaration"];
-        let all_dispatch = !parsed.top_level_kinds.is_empty()
-            && parsed
-                .top_level_kinds
-                .iter()
-                .all(|k| dispatch_kinds.contains(&k.as_str()));
-        if all_dispatch {
-            return true;
-        }
-        // Empty-parse heuristic: known glue filenames with no parsed kinds
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        // Empty-parse heuristic: known glue filenames
         if parsed.top_level_kinds.is_empty() {
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
             return matches!(
                 name.as_str(),
                 "lib.rs" | "mod.rs" | "app.rs" | "__init__.py"
             );
         }
-        // Non-empty but all-dispatch: also check __init__.py with only imports
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-        if name == "__init__.py" {
-            let dispatch_kinds = [
-                "use_declaration",
-                "mod_item",
-                "extern_crate_declaration",
-                "import_statement",
-                "import_from_statement",
-            ];
-            return parsed
-                .top_level_kinds
-                .iter()
-                .all(|k| dispatch_kinds.contains(&k.as_str()));
-        }
-        false
+
+        // All top-level nodes are dispatch-only → Glue
+        parsed
+            .top_level_kinds
+            .iter()
+            .all(|k| DISPATCH_KINDS.contains(&k.as_str()))
     }
 
     /// Rule 9 – top_level_kinds contains class / type / struct / enum / impl /
@@ -145,6 +140,14 @@ pub mod rules {
     /// Python decorated classes (`@dataclass`, `@attrs`) emit `decorated_definition`
     /// at the top level rather than `class_definition`.  Python and Shell modules
     /// are often function-based with no class at the top level.
+    ///
+    /// Node name provenance:
+    /// - `class_definition`    — tree-sitter-python (all versions)
+    /// - `decorated_definition`— tree-sitter-python (all versions); wraps @decorator + class/fn
+    /// - `type_declaration`    — tree-sitter-go (all versions)
+    /// - `function_definition` — tree-sitter-python, tree-sitter-bash
+    /// - `function_declaration`— tree-sitter-go
+    /// - `struct_item`, `enum_item`, `impl_item` — tree-sitter-rust (all versions)
     pub fn is_domain_logic(parsed: &ParsedFile) -> bool {
         parsed.top_level_kinds.iter().any(|k| {
             k == "class_definition"
