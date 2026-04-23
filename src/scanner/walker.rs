@@ -26,6 +26,8 @@ static IGNORED_DIRS: &[&str] = &[
     "__pycache__",
     ".venv",
     "dist",
+    // fuzz corpus — binary fuzzing inputs, not source code
+    "corpus",
     // git worktrees — never scan these; they duplicate the main tree
     ".worktrees",
     // claude Code agent worktrees live under .claude/worktrees/

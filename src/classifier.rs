@@ -7,10 +7,10 @@ pub mod rules {
 
     use crate::{model::SourceLang, scanner::parser::ParsedFile};
 
-    /// Rule 1 – path contains "test" or "spec" → TestHarness
+    /// Rule 1 – path contains "test", "spec", or "fuzz" → TestHarness
     pub fn is_test_harness(path: &Path) -> bool {
         let s = path.to_string_lossy().to_lowercase();
-        s.contains("test") || s.contains("spec")
+        s.contains("test") || s.contains("spec") || s.contains("fuzz")
     }
 
     /// Rule 2 – path contains "fixture" → Discard
@@ -99,12 +99,14 @@ pub mod rules {
     /// Dispatch-only node kinds across all supported grammars.
     ///
     /// Rust:   use_declaration, mod_item, extern_crate_declaration
+    ///         attribute_item (#[cfg(...)], #[allow(...)], etc.)
     ///         line_comment, block_comment (//! and /* */ doc headers)
     /// Python: import_statement, import_from_statement
     const DISPATCH_KINDS: &[&str] = &[
         "use_declaration",
         "mod_item",
         "extern_crate_declaration",
+        "attribute_item",
         "import_statement",
         "import_from_statement",
         "line_comment",
@@ -158,6 +160,7 @@ pub mod rules {
     /// - `function_item`       — tree-sitter-rust (all versions); covers `fn` and `async fn`
     /// - `const_item`          — tree-sitter-rust; named constants and SQL query banks
     /// - `static_item`         — tree-sitter-rust; static values
+    /// - `macro_definition`    — tree-sitter-rust; `macro_rules!` definitions
     /// - `struct_item`, `enum_item`, `impl_item` — tree-sitter-rust (all versions)
     pub fn is_domain_logic(parsed: &ParsedFile) -> bool {
         parsed.top_level_kinds.iter().any(|k| {
@@ -169,6 +172,8 @@ pub mod rules {
                 || k == "function_item"
                 || k == "const_item"
                 || k == "static_item"
+                || k == "macro_definition"
+                || k == "type_item"
                 || k == "function_definition"
                 || k == "function_declaration"
                 || k == "decorated_definition"
