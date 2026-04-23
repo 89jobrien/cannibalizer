@@ -26,7 +26,10 @@ static IGNORED_DIRS: &[&str] = &[
     "__pycache__",
     ".venv",
     "dist",
-    // fuzz corpus — binary fuzzing inputs, not source code
+    // fuzz corpus — binary fuzzing inputs, not source code. This is a
+    // deliberate bare-word exception: fuzzing corpora are unambiguously not
+    // source and the name is sufficiently specific that false-positive risk is
+    // low, unlike generic words ("old", "backup") excluded by the convention.
     "corpus",
     // git worktrees — never scan these; they duplicate the main tree
     ".worktrees",

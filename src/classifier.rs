@@ -102,6 +102,10 @@ pub mod rules {
     ///         attribute_item (#[cfg(...)], #[allow(...)], etc.)
     ///         line_comment, block_comment (//! and /* */ doc headers)
     /// Python: import_statement, import_from_statement
+    ///
+    /// Searched with a linear scan — acceptable for this small fixed set.
+    /// If the list grows beyond ~15 entries, replace with a `match` arm or
+    /// `phf_set!` to avoid the implicit O(n) assumption.
     const DISPATCH_KINDS: &[&str] = &[
         "use_declaration",
         "mod_item",
@@ -118,15 +122,14 @@ pub mod rules {
     ///
     /// The empty-kinds guard prevents misclassifying truly unknown files as Glue.
     pub fn is_glue(parsed: &ParsedFile, path: &Path) -> bool {
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-
         // Empty-parse heuristic: known glue filenames, or any Rust file that
         // parsed to zero top-level kinds (empty stubs, BAML-generated placeholders,
         // comment-only files).
         if parsed.top_level_kinds.is_empty() {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
             if matches!(
                 name.as_str(),
                 "lib.rs" | "mod.rs" | "app.rs" | "__init__.py"
