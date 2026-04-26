@@ -32,7 +32,7 @@ approval at each step.
 
 ## Scripts
 
-`skills/cannibalizer/scripts/scan.nu` — Nushell scanner that emits a JSONL
+`skills/cnbl/scripts/scan.nu` — Nushell scanner that emits a JSONL
 stream of classified files from the target repo.
 
 ## License

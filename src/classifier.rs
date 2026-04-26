@@ -92,8 +92,8 @@ pub mod rules {
             .top_level_kinds
             .iter()
             .any(|k| k == "function_definition" || k == "function_declaration");
-        has_main_func && parsed.raw_source.contains("def main")
-            || parsed.raw_source.contains("func main(")
+        has_main_func
+            && (parsed.raw_source.contains("def main") || parsed.raw_source.contains("func main("))
     }
 
     /// Dispatch-only node kinds across all supported grammars.
@@ -220,15 +220,15 @@ pub fn classify(parsed: &ParsedFile, path: &Path) -> ItemKind {
     if rules::is_adapter(path) {
         return ItemKind::Adapter;
     }
-    // 5b – TypeScript catch-all fires after path-based Port/Adapter detection
-    // so that TS files in adapters/ or infra/ paths are not misclassified as
+    // 8 – Entrypoint before TS catch-all so main.ts / cmd/*.ts classify correctly
+    if rules::is_entrypoint(parsed, path) {
+        return ItemKind::Entrypoint;
+    }
+    // 5b – TypeScript catch-all fires after path-based Port/Adapter and Entrypoint
+    // detection so that TS files in cmd/ or named main.ts are not misclassified as
     // DomainLogic. Without tree-sitter-typescript, all TS files fall here.
     if rules::is_typescript(parsed) {
         return ItemKind::DomainLogic;
-    }
-    // 8
-    if rules::is_entrypoint(parsed, path) {
-        return ItemKind::Entrypoint;
     }
     // 9
     if rules::is_domain_logic(parsed) {

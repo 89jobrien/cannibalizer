@@ -130,7 +130,7 @@ fn print_summary_stderr(plan: &MigrationPlan) {
             Destination::NewCrate { suggested_name } => Some(suggested_name.clone()),
             _ => None,
         })
-        .collect::<std::collections::HashSet<_>>()
+        .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect();
 

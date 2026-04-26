@@ -93,12 +93,12 @@ TestHarness->Discard, Config->Archive, Script->keyword match), then
 falls back to keyword scoring against repo names/descriptions.
 Unmatched items suggest a new crate name from the file stem.
 
-## Classifier Conformance Tests
+## Classifier Conformance Tests (planned)
 
-When modifying `src/classifier.rs` (rules, ordering, or new
-categories), all 9 conformance tests in
-`tests/conformance_classifier.rs` must pass. These are invariants,
-not examples -- they guard structural properties of the classifier.
+The following 9 conformance tests are specified in
+`specs/classifier-hardening.md` but **not yet implemented**.
+When implemented in `tests/conformance_classifier.rs`, they must
+pass before any classifier change is merged.
 
 | ID  | Invariant                                                        |
 | --- | ---------------------------------------------------------------- |

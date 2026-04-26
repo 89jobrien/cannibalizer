@@ -149,7 +149,10 @@ fn copy_preserving(src: &Path, dest: &Path) -> anyhow::Result<()> {
 
 fn copy_dir_all(src: &Path, dest: &Path) -> anyhow::Result<()> {
     if !src.exists() {
-        return Ok(());
+        anyhow::bail!(
+            "scaffold source directory does not exist: {}",
+            src.display()
+        );
     }
     std::fs::create_dir_all(dest)
         .with_context(|| format!("cannot create dir: {}", dest.display()))?;
