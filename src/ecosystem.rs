@@ -144,10 +144,8 @@ pub fn route(item: HarvestItem, repos: &[EcosystemRepo]) -> RouteDecision {
                 rationale: "script with no matching ecosystem target".to_string(),
             };
         }
-        ItemKind::Spec => {
-            if path_str.contains("todo") || path_str.contains("task") {
-                return repo_decision(item, "doob", repos, "spec path matches todo/task");
-            }
+        ItemKind::Spec if path_str.contains("todo") || path_str.contains("task") => {
+            return repo_decision(item, "doob", repos, "spec path matches todo/task");
         }
         _ => {}
     }
