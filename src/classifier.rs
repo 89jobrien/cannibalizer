@@ -190,7 +190,22 @@ pub mod rules {
     }
 }
 
-/// Classify a parsed file using a 10-rule priority chain.
+/// Classify a parsed file using a priority chain.
+///
+/// | Priority | Rule            | Kind         | Signal  |
+/// |----------|-----------------|--------------|---------|
+/// | 1        | is_test_harness | TestHarness  | path    |
+/// | 2        | is_fixture      | Discard      | path    |
+/// | 3        | is_script       | Script       | lang    |
+/// | 4        | is_spec         | Spec         | lang    |
+/// | 5        | is_config       | Config       | lang    |
+/// | 6        | is_port         | Port         | content |
+/// | 7        | is_adapter      | Adapter      | path    |
+/// | 8        | is_entrypoint   | Entrypoint   | path    |
+/// | 5b       | is_typescript   | DomainLogic  | lang    |
+/// | 9        | is_domain_logic | DomainLogic  | content |
+/// | 9a       | is_glue         | Glue         | content |
+/// | --       | fallthrough     | Discard      | --      |
 pub fn classify(parsed: &ParsedFile, path: &Path) -> ItemKind {
     // 1
     if rules::is_test_harness(path) {
