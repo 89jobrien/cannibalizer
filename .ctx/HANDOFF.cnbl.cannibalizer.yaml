@@ -1,19 +1,73 @@
 project: cnbl
 id: cnbl
-updated: 2026-04-23
+updated: 20260426:062926
 items:
+  - id: conformance-tests
+    title: Implement classifier conformance tests C1-C9
+    description: >
+      Write tests/conformance_classifier.rs per specs/classifier-hardening.md.
+      9 invariant tests covering determinism, reachability, case-insensitivity,
+      precedence pairs, safety (empty inputs, unknown kinds), and regressions
+      for df6437a fixes.
+    priority: P1
+    status: open
+    files:
+      - tests/conformance_classifier.rs
+      - specs/classifier-hardening.md
+  - id: discover-cmd
+    title: Implement cnbl discover subcommand
+    description: >
+      Add `cnbl discover [--path DIR] [--output FILE]` per specs/discover.md.
+      Scans immediate children of a directory for git repos, extracts metadata
+      via git commands, writes repos.json. Phase 1 only (no embeddings).
+    priority: P1
+    status: open
+    files:
+      - src/cmd/discover.rs
+      - src/adapters/git_discoverer.rs
+      - src/adapters/json_writer.rs
+      - src/ecosystem.rs
+      - specs/discover.md
+  - id: ts-classifier-gap
+    title: Add T1/T2 regression tests from classifier-hardening spec
+    description: >
+      Add the 6 targeted tests from specs/classifier-hardening.md T1 and T2
+      sections to src/classifier.rs: non-empty Rust zero-kinds gives Discard,
+      whitespace-only Rust gives Glue, TS in adapter/infra/port paths.
+    priority: P2
+    status: open
+    files:
+      - src/classifier.rs
 log:
-  - date: 20260423::session2
-    summary: |
-      P0 sprint complete. Added ItemKind::Glue for pure dispatch files (lib.rs, mod.rs, app.rs,
-      or files with only use/mod/extern_crate top-level nodes). Fixed rule 8 entrypoint detection
-      to use file stem equality instead of substring match (was misclassifying any file in
-      domain/ as Entrypoint). Extended walker IGNORED_DIRS with 9 archive dir patterns. 74 tests
+  - date: 20260426:062926
+    session: 3
+    summary: >
+      Council analysis, spec authoring, and plugin packaging. Wrote
+      specs/classifier-hardening.md (conformance tests C1-C9, regression
+      tests T1-T2, fuzz target) and specs/discover.md (cnbl discover
+      subcommand, full schema + testing strategy + Phase 2 embeddings).
+      Added CLAUDE.md with build commands, architecture overview, and
+      classifier conformance table. Split monolithic cannibalizer skill
+      into 6 focused skills (cnbl, scan, plan, gen, eat, classify).
+      Renamed skills/cannibalizer -> skills/cnbl. Added doob URL to
+      obfsck allowlist. All 80 tests passing.
+    commits: [f5130da]
+  - date: 20260423:session2
+    session: 2
+    summary: >
+      P0 sprint complete. Added ItemKind::Glue for pure dispatch files (lib.rs,
+      mod.rs, app.rs, or files with only use/mod/extern_crate top-level nodes).
+      Fixed rule 8 entrypoint detection to use file stem equality instead of
+      substring match (was misclassifying any file in domain/ as Entrypoint).
+      Extended walker IGNORED_DIRS with 9 archive dir patterns. 74 tests
       passing. Commit: dcc6be1.
     commits: [dcc6be1]
-    session: 2
-  - date: 20260423::031525
-    summary: |
-      Cloned repo, renamed exec→eat, updated CLI descriptions. Added tree-sitter-rust grammar, fixed Rust struct/trait/enum/impl classification, expanded adapter path rules (store_, source_, /inbox/). All 66 tests passing. Ran live scan against kan — classification working but discard definition needs sprint.
-    commits: []
+  - date: 20260423:031525
     session: 1
+    summary: >
+      Cloned repo, renamed exec->eat, updated CLI descriptions. Added
+      tree-sitter-rust grammar, fixed Rust struct/trait/enum/impl
+      classification, expanded adapter path rules (store_, source_, /inbox/).
+      All 66 tests passing. Ran live scan against kan — classification working
+      but discard definition needs sprint.
+    commits: []
