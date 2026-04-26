@@ -501,4 +501,312 @@ mod tests {
         );
         assert!(matches!(classify(&p, &path), ItemKind::Adapter));
     }
+
+    // ── Conformance tests (C1–C9) ──────────────────────────────────────
+
+    #[test]
+    fn c1_deterministic() {
+        let cases = [
+            make_parsed("src/lib.rs", SourceLang::Rust, vec!["mod_item"], "mod x;"),
+            make_parsed("src/main.py", SourceLang::Python, vec![], ""),
+            make_parsed("src/agent.ts", SourceLang::TypeScript, vec![], ""),
+            make_parsed("src/weird.rs", SourceLang::Rust, vec![], "unparseable"),
+            make_parsed("docs/api.md", SourceLang::Markdown, vec![], "# API"),
+        ];
+        for (p, path) in &cases {
+            let a = classify(p, path);
+            let b = classify(p, path);
+            assert_eq!(
+                std::mem::discriminant(&a),
+                std::mem::discriminant(&b),
+                "classify must be deterministic for {:?}",
+                path,
+            );
+        }
+    }
+
+    #[test]
+    fn c2_all_item_kinds_reachable() {
+        let cases: Vec<((ParsedFile, PathBuf), ItemKind)> = vec![
+            (
+                make_parsed("tests/foo.rs", SourceLang::Rust, vec![], ""),
+                ItemKind::TestHarness,
+            ),
+            (
+                make_parsed("data/fixture.py", SourceLang::Python, vec![], ""),
+                ItemKind::Discard,
+            ),
+            (
+                make_parsed("run.sh", SourceLang::Shell, vec![], ""),
+                ItemKind::Script,
+            ),
+            (
+                make_parsed("README.md", SourceLang::Markdown, vec![], ""),
+                ItemKind::Spec,
+            ),
+            (
+                make_parsed("Cargo.toml", SourceLang::Toml, vec![], ""),
+                ItemKind::Config,
+            ),
+            (
+                make_parsed("src/port.go", SourceLang::Go, vec!["interface_type"], ""),
+                ItemKind::Port,
+            ),
+            (
+                make_parsed("src/adapter_db.py", SourceLang::Python, vec![], ""),
+                ItemKind::Adapter,
+            ),
+            (
+                make_parsed("src/main.rs", SourceLang::Rust, vec![], ""),
+                ItemKind::Entrypoint,
+            ),
+            (
+                make_parsed("src/model.rs", SourceLang::Rust, vec!["struct_item"], ""),
+                ItemKind::DomainLogic,
+            ),
+            (
+                make_parsed(
+                    "src/lib.rs",
+                    SourceLang::Rust,
+                    vec!["use_declaration"],
+                    "use x;",
+                ),
+                ItemKind::Glue,
+            ),
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for ((p, path), expected) in &cases {
+            let got = classify(p, path);
+            assert_eq!(
+                std::mem::discriminant(&got),
+                std::mem::discriminant(expected),
+                "{:?}: expected {:?}, got {:?}",
+                path,
+                expected,
+                got,
+            );
+            seen.insert(format!("{:?}", got));
+        }
+        assert!(
+            seen.len() >= 9,
+            "expected all 9 distinct ItemKind variants reachable, got {}",
+            seen.len(),
+        );
+    }
+
+    #[test]
+    fn c3_path_rules_case_insensitive() {
+        let pairs = [
+            ("src/Test_utils.py", "src/test_utils.py"),
+            ("data/FIXTURE_data.py", "data/fixture_data.py"),
+            ("src/Adapter_repo.go", "src/adapter_repo.go"),
+            ("src/Backend/server.py", "src/backend/server.py"),
+            ("src/Main.py", "src/main.py"),
+        ];
+        for (upper, lower) in &pairs {
+            let (pu, pu_path) = make_parsed(upper, SourceLang::Python, vec![], "");
+            let (pl, pl_path) = make_parsed(lower, SourceLang::Python, vec![], "");
+            let ru = classify(&pu, &pu_path);
+            let rl = classify(&pl, &pl_path);
+            assert_eq!(
+                std::mem::discriminant(&ru),
+                std::mem::discriminant(&rl),
+                "case mismatch: {:?} -> {:?}, {:?} -> {:?}",
+                upper,
+                ru,
+                lower,
+                rl,
+            );
+        }
+    }
+
+    #[test]
+    fn c4_lang_rules_path_independent() {
+        for path_str in &["src/foo.sh", "lib/bar.sh", "deep/nested/baz.sh"] {
+            let (p, path) = make_parsed(path_str, SourceLang::Shell, vec![], "");
+            assert!(
+                matches!(classify(&p, &path), ItemKind::Script),
+                "Shell file at {} should be Script",
+                path_str,
+            );
+        }
+        for path_str in &["docs/a.md", "lib/b.md", "x.md"] {
+            let (p, path) = make_parsed(path_str, SourceLang::Markdown, vec![], "");
+            assert!(
+                matches!(classify(&p, &path), ItemKind::Spec),
+                "Markdown at {} should be Spec",
+                path_str,
+            );
+        }
+    }
+
+    #[test]
+    fn c5_precedence_pairs() {
+        let cases: Vec<(&str, SourceLang, Vec<&str>, &str, ItemKind)> = vec![
+            // R1 > R2: path has both "test" and "fixture"
+            (
+                "tests/fixtures/helper.py",
+                SourceLang::Python,
+                vec![],
+                "",
+                ItemKind::TestHarness,
+            ),
+            // R1 > R3: test path + Shell lang
+            (
+                "tests/run.sh",
+                SourceLang::Shell,
+                vec![],
+                "",
+                ItemKind::TestHarness,
+            ),
+            // R2 > R3: fixture path + Shell lang
+            (
+                "data/fixture_run.sh",
+                SourceLang::Shell,
+                vec![],
+                "",
+                ItemKind::Discard,
+            ),
+            // R6 > R7: Port content + adapter path
+            (
+                "src/adapter_port.go",
+                SourceLang::Go,
+                vec!["interface_type"],
+                "",
+                ItemKind::Port,
+            ),
+            // R7 > TS catch-all: adapter path + TS lang
+            (
+                "src/adapters/client.ts",
+                SourceLang::TypeScript,
+                vec![],
+                "",
+                ItemKind::Adapter,
+            ),
+            // R7 > R9: adapter path + domain-logic content
+            (
+                "src/adapter_repo.py",
+                SourceLang::Python,
+                vec!["class_definition"],
+                "",
+                ItemKind::Adapter,
+            ),
+            // R9 > R9a: domain-logic content + glue-only kinds also present
+            (
+                "src/lib.rs",
+                SourceLang::Rust,
+                vec!["struct_item", "use_declaration"],
+                "use x;\nstruct Foo;",
+                ItemKind::DomainLogic,
+            ),
+        ];
+        for (path_str, lang, kinds, raw, expected) in &cases {
+            let (p, path) = make_parsed(path_str, lang.clone(), kinds.clone(), raw);
+            let got = classify(&p, &path);
+            assert_eq!(
+                std::mem::discriminant(&got),
+                std::mem::discriminant(expected),
+                "precedence: {:?} expected {:?}, got {:?}",
+                path_str,
+                expected,
+                got,
+            );
+        }
+    }
+
+    #[test]
+    fn c6_empty_inputs_no_panic() {
+        let langs = [
+            SourceLang::Rust,
+            SourceLang::Python,
+            SourceLang::Go,
+            SourceLang::TypeScript,
+            SourceLang::Shell,
+            SourceLang::Nushell,
+            SourceLang::Markdown,
+            SourceLang::Toml,
+            SourceLang::Yaml,
+            SourceLang::Json,
+            SourceLang::Baml,
+            SourceLang::Unknown,
+        ];
+        for lang in &langs {
+            let (p, path) = make_parsed("", lang.clone(), vec![], "");
+            let _ = classify(&p, &path);
+
+            let (p, path) = make_parsed("", lang.clone(), vec!["struct_item"], "struct Foo;");
+            let _ = classify(&p, &path);
+
+            let (p, path) = make_parsed("src/foo.rs", lang.clone(), vec![], "");
+            let _ = classify(&p, &path);
+        }
+    }
+
+    #[test]
+    fn c7_unknown_kinds_give_discard() {
+        let (p, path) = make_parsed(
+            "src/foo.rs",
+            SourceLang::Rust,
+            vec!["completely_made_up_kind", "another_fake_kind"],
+            "some content",
+        );
+        assert!(matches!(classify(&p, &path), ItemKind::Discard));
+    }
+
+    #[test]
+    fn c8_nonempty_rust_zero_kinds_not_glue() {
+        let contents = [
+            ("fn main() {}", false),               // valid but unparsed
+            ("some content parser missed", false), // garbage
+            ("   \n\n  \t  ", true),               // whitespace-only (Glue OK)
+        ];
+        for (raw, expect_glue) in &contents {
+            let (p, path) = make_parsed("src/mystery.rs", SourceLang::Rust, vec![], raw);
+            let result = classify(&p, &path);
+            if *expect_glue {
+                assert!(
+                    matches!(result, ItemKind::Glue),
+                    "whitespace-only Rust should be Glue, got {:?}",
+                    result,
+                );
+            } else {
+                assert!(
+                    !matches!(result, ItemKind::Glue),
+                    "non-empty Rust with zero kinds should not be Glue, got {:?}",
+                    result,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn c9_typescript_path_precedence() {
+        // Adapter paths
+        for path_str in &[
+            "src/adapters/client.ts",
+            "src/backend/api.ts",
+            "src/integration/hook.ts",
+            "src/provider/auth.ts",
+        ] {
+            let (p, path) = make_parsed(path_str, SourceLang::TypeScript, vec![], "");
+            assert!(
+                matches!(classify(&p, &path), ItemKind::Adapter),
+                "TS at {} should be Adapter",
+                path_str,
+            );
+        }
+
+        // Port content wins over TS catch-all
+        let (p, path) = make_parsed(
+            "src/ports/repo.ts",
+            SourceLang::TypeScript,
+            vec!["interface_type"],
+            "",
+        );
+        assert!(matches!(classify(&p, &path), ItemKind::Port));
+
+        // Generic TS path still falls to DomainLogic
+        let (p, path) = make_parsed("src/service.ts", SourceLang::TypeScript, vec![], "");
+        assert!(matches!(classify(&p, &path), ItemKind::DomainLogic));
+    }
 }
