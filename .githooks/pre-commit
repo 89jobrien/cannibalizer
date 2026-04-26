@@ -1,26 +1,19 @@
 #!/usr/bin/env bash
-# Auto-bump patch version in Cargo.toml on every commit that touches
-# source files. Humans bump minor versions manually for releases.
-#
-# Opt-in: presence of this file in .githooks/ enables the behavior.
-# The global pre-commit hook chains this script if it exists.
+# Auto-bump patch version in Cargo.toml when .rs files are committed.
+# Humans bump minor versions manually for releases.
 set -euo pipefail
 
-# Only bump if staged changes include files that matter (not just docs/config)
 STAGED=$(git diff --cached --name-only --diff-filter=d)
 [[ -z "$STAGED" ]] && exit 0
-
-# Check for Cargo.toml in repo root
 [[ ! -f Cargo.toml ]] && exit 0
 
-# Skip if this commit is already a version bump (avoid infinite loop with amend)
-MSG_FILE="${GIT_DIR:-.git}/COMMIT_EDITMSG"
-if [[ -f "$MSG_FILE" ]] && grep -q '^chore: bump version' "$MSG_FILE" 2>/dev/null; then
+# Only bump if Rust source files are staged
+if ! echo "$STAGED" | grep -q '\.rs$'; then
     exit 0
 fi
 
 # Extract current version
-CURRENT=$(grep '^version *= *"' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+CURRENT=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
 [[ -z "$CURRENT" ]] && exit 0
 
 # Parse semver components
@@ -28,10 +21,10 @@ IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 PATCH=$((PATCH + 1))
 NEW="${MAJOR}.${MINOR}.${PATCH}"
 
-# Replace version in Cargo.toml (first occurrence only)
-sed -i '' "0,/^version *= *\"${CURRENT}\"/s//version = \"${NEW}\"/" Cargo.toml
+# Replace first version line in Cargo.toml (macOS-compatible sed)
+sed -i '' "s/^version = \"${CURRENT}\"/version = \"${NEW}\"/" Cargo.toml
 
-# Also update Cargo.lock if it exists and is tracked
+# Update Cargo.lock if tracked
 if git ls-files --error-unmatch Cargo.lock &>/dev/null; then
     cargo generate-lockfile --quiet 2>/dev/null || true
     git add Cargo.lock
