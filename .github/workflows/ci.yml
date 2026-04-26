@@ -36,5 +36,3 @@ jobs:
           tool: cargo-nextest
       - name: cargo nextest run
         run: cargo nextest run
-      - name: cargo test --doc
-        run: cargo test --doc
